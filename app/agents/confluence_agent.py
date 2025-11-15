@@ -19,6 +19,7 @@ logger = get_logger(__name__)
 
 # Global MCP client instance (lazy initialization)
 _mcp_client: MultiServerMCPClient | None = None
+_mcp_client_lock = asyncio.Lock()
 
 # Global MCP tools cache (lazy initialization with caching)
 _mcp_tools_cache: dict[str, dict] | None = None
@@ -81,10 +82,6 @@ def _convert_mcp_json_config(config: dict) -> dict:
             raise ValueError(f"Unknown server configuration format for {server_name}")
 
     return converted
-
-
-_mcp_client: MultiServerMCPClient | None = None
-_mcp_client_lock = asyncio.Lock()
 
 
 async def get_mcp_client() -> MultiServerMCPClient:
@@ -204,7 +201,7 @@ def initialize_mcp_tools_on_import():
     """
     global _mcp_init_task
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         _mcp_init_task = loop.create_task(_initialize_mcp_tools_async())
         logger.info("Scheduled MCP tools initialization task")
     except RuntimeError:
@@ -315,11 +312,20 @@ Things to check:
 async def _build_critique_sub_agent():
     """构建评论子代理配置（异步）"""
     tools = await get_confluence_tools()
-    # 评论代理只需要搜索工具
-    search_tool = next((t for t in tools if t.name == "confluence_search"), tools[0])
+
+    # 明确查找 confluence_search
+    search_tool = next((t for t in tools if t.name == "confluence_search"), None)
+
+    if search_tool is None:
+        raise RuntimeError(
+            "Critique Agent requires `confluence_search` tool, but it was not found. "
+            "Check your MCP server or tool registration."
+        )
+
     return {
         "name": "confluence-critique-agent",
-        "description": "Used to critique the final report based on Confluence research. Provide this agent with specific information about how you want it to critique the report.",
+        "description": "Used to critique the final report based on Confluence research. "
+        "Provide this agent with specific information about how you want it to critique the report.",
         "system_prompt": sub_critique_prompt,
         "tools": [search_tool],
     }
