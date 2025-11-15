@@ -1,0 +1,127 @@
+# Caddy 配置文件
+# 高性能反向代理，自动 HTTPS，零配置即用
+
+{
+    # 全局选项
+    admin off  # 禁用管理 API（生产环境）
+    
+    # 日志配置
+    log {
+        output stdout
+        format json
+        level INFO
+    }
+    
+    # 服务器超时配置 - 支持 SSE 长连接
+    servers {
+        timeouts {
+            read_body   30s     # 读取请求体超时
+            read_header 10s     # 读取请求头超时
+            write       3600s   # 写入超时（1小时，支持 SSE）
+            idle        3600s   # 空闲连接超时（1小时）
+        }
+        keepalive_interval 30s  # TCP keepalive 探测间隔
+    }
+}
+
+# HTTP 服务（开发环境）
+:80 {
+    # 健康检查端点
+    handle /health {
+        respond "OK" 200
+    }
+
+    #
+    # 1) 后端 API —— 优先匹配、保留完整路径
+    #
+    # 后端 API 路由 - 支持 SSE 长连接（最长 1 小时）
+    handle_path /api/* {
+        reverse_proxy backend:2024 {
+            # 保持原始请求头    
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            
+            # HTTP 传输配置 - SSE 长连接支持
+            transport http {
+                dial_timeout 10s
+                response_header_timeout 3600s  # 1 小时，支持 SSE
+                keepalive 3600s                # 保持连接 1 小时
+                keepalive_interval 30s         # 每 30 秒发送 keepalive
+                keepalive_idle_conns 100       # 最大空闲连接数
+            }
+        }
+    }
+
+    # 前端路由 - 转发到 Next.js（支持 WebSocket）
+    handle /* {
+        reverse_proxy frontend:3000 {
+            # 保持原始请求头
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            
+            # WebSocket 支持
+            header_up Connection {>Connection}
+            header_up Upgrade {>Upgrade}
+            
+            # HTTP 传输配置
+            transport http {
+                dial_timeout 10s
+                response_header_timeout 300s
+                keepalive 300s          # 保持连接 5 分钟
+                keepalive_interval 30s  # 每 30 秒发送 keepalive
+            }
+        }
+    }
+
+    # 启用 gzip 压缩
+    encode gzip zstd
+
+    # 访问日志
+    log {
+        output stdout
+        format json {
+            time_format "iso8601"
+        }
+    }
+}
+
+# HTTPS 服务（生产环境）
+# 取消下面的注释并修改域名即可启用自动 HTTPS
+# yourdomain.com {
+#     # API 路由
+#     handle /api/* {
+#         reverse_proxy backend:8000 {
+#             header_up Host {host}
+#             header_up X-Real-IP {remote_host}
+#             header_up X-Forwarded-For {remote_host}
+#             header_up X-Forwarded-Proto {scheme}
+#         }
+#     }
+#
+#     # 前端路由
+#     handle /* {
+#         reverse_proxy frontend:3000 {
+#             header_up Host {host}
+#             header_up X-Real-IP {remote_host}
+#             header_up X-Forwarded-For {remote_host}
+#             header_up X-Forwarded-Proto {scheme}
+#         }
+#     }
+#
+#     # 启用压缩
+#     encode gzip zstd
+#
+#     # 访问日志
+#     log {
+#         output file /data/access.log {
+#             roll_size 100mb
+#             roll_keep 5
+#             roll_keep_for 720h
+#         }
+#         format json
+#     }
+# }
+
+
