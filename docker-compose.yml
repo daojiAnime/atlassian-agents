@@ -89,7 +89,7 @@ configs:
       {
         "dependencies": ["."],
         "graphs": {
-          "agent": "./main.py:universal_qa_agent"
+          "agent": "./main.py:create_universal_qa_agent_async"
         },
         "env": ".env"
       }
@@ -98,7 +98,7 @@ configs:
       {
         "dependencies": ["."],
         "graphs": {
-          "agent": "./main.py:confluence_agent"
+          "agent": "./main.py:create_confluence_research_agent_async"
         },
         "env": ".env"
       }
