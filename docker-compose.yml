@@ -63,12 +63,12 @@ services:
       dockerfile: Dockerfile
     container_name: deep-agents-server
     environment:
-      - INIT_LLM_MODEL={INIT_LLM_MODEL:-openai:deepseek-ai/DeepSeek-V3.2-Exp}
-      - OPENAI_API_KEY={OPENAI_API_KEY:-}
-      - OPENAI_API_BASE={OPENAI_API_BASE:-https://api.siliconflow.cn/v1}
-      - LANGCHAIN_TRACING_V2={LANGCHAIN_TRACING_V2:-false}
-      - LANGCHAIN_PROJECT={LANGCHAIN_PROJECT:-deepagents}
-      - LANGCHAIN_API_KEY={LANGCHAIN_API_KEY:-}
+      - INIT_LLM_MODEL=${INIT_LLM_MODEL:-openai:deepseek-ai/DeepSeek-V3.2-Exp}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_API_BASE=${OPENAI_API_BASE:-https://api.siliconflow.cn/v1}
+      - LANGCHAIN_TRACING_V2=${LANGCHAIN_TRACING_V2:-false}
+      - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT:-deepagents}
+      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY:-}
     restart: unless-stopped
     entrypoint: ["langgraph", "dev", "--no-browser", "--no-reload" , "--host", "0.0.0.0", "--port", "2024"]
     configs:
