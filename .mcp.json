@@ -6,12 +6,9 @@
         "run",
         "-i",
         "--rm",
-        "-e",
-        "CONFLUENCE_URL",
-        "-e",
-        "CONFLUENCE_USERNAME",
-        "-e",
-        "CONFLUENCE_PERSONAL_TOKEN",
+        "-e CONFLUENCE_URL",
+        "-e CONFLUENCE_USERNAME",
+        "-e CONFLUENCE_PERSONAL_TOKEN",
         "ghcr.io/sooperset/mcp-atlassian:latest"
       ],
       "env": {
