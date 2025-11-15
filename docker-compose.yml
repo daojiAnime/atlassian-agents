@@ -1,0 +1,119 @@
+x-restart: &restart_policy
+  restart: unless-stopped
+  deploy:
+    restart_policy:
+      condition: on-failure
+      delay: 60s
+services:
+  # Caddy 反向代理（轻量级、高性能）
+  caddy:
+    image: caddy:2-alpine
+    container_name: deep-agents-caddy
+    ports:
+      - "20013:80"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:80/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  # Next.js 前端
+  frontend:
+    build:
+      context: ./deep-agents-ui
+      dockerfile: Dockerfile
+    container_name: deep-agents-ui
+    environment:
+      - NODE_ENV=production
+      - LANGSMITH_API_KEY=
+    ports:
+      - "20012:3000"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # FastAPI 后端
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: deep-agents-server
+    environment:
+      - INIT_LLM_MODEL=${INIT_LLM_MODEL:-openai:deepseek-ai/DeepSeek-V3.2-Exp}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_API_BASE=${OPENAI_API_BASE:-https://api.siliconflow.cn/v1}
+      - LANGCHAIN_TRACING_V2=${LANGCHAIN_TRACING_V2:-false}
+      - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT:-deepagents}
+      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY:-}
+    restart: unless-stopped
+    entrypoint: ["langgraph", "dev", "--no-browser", "--no-reload" , "--host", "0.0.0.0", "--port", "2024"]
+    configs:
+      # 通用问答
+      # - source: langgraph-config-universal-qa
+      #   target: /app/langgraph.json
+      # 深度研究
+      - source: langgraph-config-research
+        target: /app/langgraph.json
+      # MCP 配置
+      - source: mcp-json
+        target: /app/.mcp.json
+
+
+configs:
+  langgraph-config-universal-qa:
+    content: |
+      {
+        "dependencies": ["."],
+        "graphs": {
+          "agent": "./main.py:create_universal_qa_agent_async"
+        },
+        "env": ".env"
+      }
+  langgraph-config-research:
+    content: |
+      {
+        "dependencies": ["."],
+        "graphs": {
+          "agent": "./main.py:create_confluence_research_agent_async"
+        },
+        "env": ".env"
+      }
+  mcp-json:
+    content: |
+      {
+        "mcpServers": {
+          "mcp-atlassian": {
+            "command": "uvx",
+            "args": ["--with", "pydantic==2.11.9", "mcp-atlassian"],
+            "env": {
+              "CONFLUENCE_URL": "https://confluence.example.com",
+              "CONFLUENCE_USERNAME": "username",
+              "CONFLUENCE_PERSONAL_TOKEN": "Create a personal token in Confluence"
+            }
+          }
+        }
+      }

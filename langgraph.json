@@ -1,0 +1,8 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "universal_qa": "./main.py:create_universal_qa_agent_async",
+    "confluence": "./main.py:create_confluence_research_agent_async"
+  },
+  "env": ".env"
+}

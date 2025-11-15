@@ -1,0 +1,88 @@
+[project]
+name = "atlassian-agents"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "python-dotenv>=1.0.0",
+    "requests>=2.32.4",
+    "rich>=14.1.0",
+    "structlog>=25.4.0",
+    "pydantic-settings>=2.10.1",
+    "tenacity>=9.1.2",
+    "langchain>=1.0.5",
+    "langgraph-cli[inmem]>=0.4.7",
+    "deepagents>=0.2.6",
+    "langchain-mcp-adapters>=0.1.12",
+    "langchain-openai>=1.0.2",
+]
+
+[dependency-groups]
+dev = [
+    "ipython>=9.4.0",
+    "ipywidgets>=8.1.7",
+    "pytest>=8.4.1",
+    "ruff>=0.12.9",
+    "ipykernel>=6.30.1",
+]
+
+
+[tool.mypy]
+strict = true
+exclude = ["venv", ".venv", "alembic"]
+
+# 忽略指定位置的特定错误
+[[tool.mypy.overrides]]
+module = "transformers.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "fitz"
+ignore_missing_imports = true
+
+[tool.ruff]
+exclude = ["deep-agents-ui", "scripts", ".venv"]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+    "ARG001", # unused arguments in functions
+]
+ignore = [
+    "E501", # line too long, handled by black
+    "B008", # do not perform function calls in argument defaults
+    "W191", # indentation contains tabs
+    "B904", # Allow raising exceptions without from e, for HTTPException
+    "C417",
+]
+
+[tool.ruff.lint.pyupgrade]
+# Preserve types, even if a file imports `from __future__ import annotations`.
+keep-runtime-typing = true
+
+# [[tool.uv.index]]
+# name = "ustc"
+# url = "https://mirrors.ustc.edu.cn/pypi/simple"
+# default = true
+
+# [[tool.uv.index]]
+# name = "tsinghua"
+# url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple"
+# default = true
+
+
+[tool.uv]
+package = false
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

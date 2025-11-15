@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "mcp-atlassian": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e CONFLUENCE_URL",
+        "-e CONFLUENCE_USERNAME",
+        "-e CONFLUENCE_PERSONAL_TOKEN",
+        "ghcr.io/sooperset/mcp-atlassian:latest"
+      ],
+      "env": {
+        "CONFLUENCE_URL": "https://confluence.example.com",
+        "CONFLUENCE_USERNAME": "username",
+        "CONFLUENCE_PERSONAL_TOKEN": "Create a personal token in Confluence"
+      }
+    }
+  }
+}
