@@ -83,55 +83,25 @@ def _convert_mcp_json_config(config: dict) -> dict:
     return converted
 
 
+_mcp_client: MultiServerMCPClient | None = None
+_mcp_client_lock = asyncio.Lock()
+
+
 async def get_mcp_client() -> MultiServerMCPClient:
-    """
-    获取或创建 MCP 客户端实例。
-
-    使用 asyncio.to_thread() 将同步的文件 I/O 操作转移到线程池，避免阻塞事件循环。
-
-    Returns:
-        初始化后的 MultiServerMCPClient，已连接到 .mcp.json 中定义的 MCP 服务器
-
-    Raises:
-        FileNotFoundError: 配置文件不存在时
-        ValueError: 配置格式无效或未找到 MCP 服务器时
-    """
     global _mcp_client
 
-    if _mcp_client is None:
-        logger.info("Initializing MCP client")
+    if _mcp_client is not None:
+        return _mcp_client
+
+    async with _mcp_client_lock:
+        if _mcp_client is not None:
+            return _mcp_client
+
         config_path = Path(".mcp.json")
-
-        if not config_path.exists():
-            logger.error(
-                "mcp_config_not_found",
-                config_path=str(config_path),
-            )
-            raise FileNotFoundError(f"MCP config file not found: {config_path}")
-
-        try:
-            # 将同步文件 I/O 操作转移到线程池，避免阻塞事件循环
-            config = await asyncio.to_thread(_load_mcp_config, config_path)
-            logger.info("mcp_config_loaded", config_path=str(config_path))
-        except Exception:
-            logger.exception("mcp_config_load_failed", config_path=str(config_path))
-            raise
-
-        try:
-            # 将 Claude Code IDE 格式转换为 langchain-mcp-adapters 格式
-            servers_config = _convert_mcp_json_config(config)
-            if not servers_config:
-                logger.error("no_mcp_servers_found")
-                raise ValueError("No MCP servers found in .mcp.json")
-
-            logger.info("mcp_servers_converted", server_count=len(servers_config))
-            _mcp_client = MultiServerMCPClient(servers_config)
-            logger.info("mcp_client_initialized")
-        except Exception:
-            logger.exception("mcp_client_initialization_failed")
-            raise
-
-    return _mcp_client
+        config = await asyncio.to_thread(_load_mcp_config, config_path)
+        servers = _convert_mcp_json_config(config)
+        _mcp_client = MultiServerMCPClient(servers)
+        return _mcp_client
 
 
 async def _fetch_all_mcp_tools() -> dict[str, dict]:
