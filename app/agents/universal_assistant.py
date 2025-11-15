@@ -8,8 +8,6 @@ Confluence 通用问答助手 (Universal Q&A Assistant)
 - 输出 Markdown 格式答案含来源引用
 """
 
-import asyncio
-
 from deepagents import create_deep_agent
 from langchain.chat_models import init_chat_model
 from structlog.stdlib import get_logger
@@ -85,7 +83,7 @@ universal_qa_instructions = """你是 Confluence 知识库的通用问答助手�
 # ============================================================================
 
 
-async def _create_universal_qa_agent_async():
+async def create_universal_qa_agent_async():
     """
     异步创建 Confluence 通用问答助手。
     """
@@ -97,20 +95,6 @@ async def _create_universal_qa_agent_async():
         tools=tools,
         system_prompt=universal_qa_instructions,
     )
-
-
-def _create_universal_qa_agent_impl():
-    """
-    创建 Confluence 通用问答助手的同步包装。
-    """
-    return asyncio.run(_create_universal_qa_agent_async())
-
-
-# ============================================================================
-# 全局 Agent 实例和调用接口
-# ============================================================================
-
-universal_qa_agent = _create_universal_qa_agent_impl()
 
 
 # ============================================================================

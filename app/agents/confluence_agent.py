@@ -205,38 +205,42 @@ async def reset_mcp_tools_cache() -> None:
     logger.info("mcp_tools_cache_reset")
 
 
-def initialize_mcp_tools_sync() -> None:
-    """
-    同步初始化 MCP 工具（供模块加载时调用）。
+_mcp_init_task: asyncio.Task | None = None
 
-    此函数在 LangGraph 模块加载阶段被调用，以确保 MCP 工具在应用启动时完全就绪。
-    它使用 asyncio.run() 来在同步上下文中执行异步初始化。
 
-    调用场景：
-    - main.py 模块初始化时
-    - LangGraph CLI 启动时
-
-    如果初始化失败，会记录错误但不会抛出异常（以避免影响应用启动）。
-    """
+async def _initialize_mcp_tools_async():
+    """实际异步初始化逻辑"""
     try:
-        logger.info("Starting synchronous MCP tools initialization")
-        # 使用 asyncio.run() 在新的事件循环中执行异步初始化
-        asyncio.run(get_mcp_tools())
-        logger.info("MCP tools initialized successfully in synchronous context")
+        logger.info("Initializing MCP tools (async)...")
+        await get_mcp_tools()
+        logger.info("MCP tools initialized")
     except FileNotFoundError as e:
-        # MCP 配置文件不存在时的优雅处理
         logger.warning(
             "mcp_config_not_found_during_init",
             error=str(e),
             details="MCP tools will be initialized on first use",
         )
     except Exception as e:
-        # 其他初始化错误时的优雅处理
         logger.warning(
             "mcp_tools_initialization_failed",
             error=str(e),
             details="MCP tools will be initialized on first use",
         )
+
+
+def initialize_mcp_tools_on_import():
+    """
+    在模块加载阶段调用，不执行 await，只启动后台任务，不阻塞。
+    """
+    global _mcp_init_task
+    try:
+        loop = asyncio.get_event_loop()
+        _mcp_init_task = loop.create_task(_initialize_mcp_tools_async())
+        logger.info("Scheduled MCP tools initialization task")
+    except RuntimeError:
+        # 如果还没有事件循环，就等到第一次 async 初始化再启动
+        logger.info("No running event loop; MCP tools will initialize on demand")
+        _mcp_init_task = None
 
 
 # ============================================================================
@@ -476,13 +480,3 @@ async def create_confluence_research_agent_async():
         subagents=[critique_sub_agent, research_sub_agent],
         backend=FilesystemBackend(root_dir="./output"),
     )
-
-
-def create_confluence_research_agent():
-    """
-    创建 Confluence 研究代理（同步包装）。
-    """
-    return asyncio.run(create_confluence_research_agent_async())
-
-
-confluence_agent = create_confluence_research_agent()
