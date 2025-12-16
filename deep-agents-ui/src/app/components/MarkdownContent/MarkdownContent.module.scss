@@ -121,4 +121,30 @@
       border: 1px solid var(--color-border);
     }
   }
+
+  // Perplexica 风格的引文样式
+  .citation {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25em;
+    height: 1.25em;
+    padding: 0 0.3em;
+    margin: 0 0.1em;
+    font-size: 0.7em;
+    font-weight: $font-weight-semibold;
+    color: var(--color-primary);
+    background-color: rgba(59, 130, 246, 0.12);
+    border-radius: $radius-sm;
+    text-decoration: none;
+    vertical-align: super;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background-color: var(--color-primary);
+      color: white;
+      transform: scale(1.1);
+    }
+  }
 }

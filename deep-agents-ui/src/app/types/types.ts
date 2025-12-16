@@ -34,3 +34,12 @@ export interface Thread {
   createdAt: Date;
   updatedAt: Date;
 }
+
+/**
+ * 引用来源 (用于 Perplexica 风格的引文渲染)
+ */
+export interface Source {
+  index: number;
+  title: string;
+  url: string;
+}

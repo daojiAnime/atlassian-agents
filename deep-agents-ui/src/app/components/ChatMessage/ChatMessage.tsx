@@ -5,7 +5,7 @@ import { User, Bot } from "lucide-react";
 import { SubAgentIndicator } from "../SubAgentIndicator/SubAgentIndicator";
 import { ToolCallBox } from "../ToolCallBox/ToolCallBox";
 import { MarkdownContent } from "../MarkdownContent/MarkdownContent";
-import type { SubAgent, ToolCall } from "../../types/types";
+import type { SubAgent, ToolCall, Source } from "../../types/types";
 import styles from "./ChatMessage.module.scss";
 import { Message } from "@langchain/langgraph-sdk";
 import { extractStringFromMessageContent } from "../../utils/utils";
@@ -16,14 +16,81 @@ interface ChatMessageProps {
   showAvatar: boolean;
   onSelectSubAgent: (subAgent: SubAgent) => void;
   selectedSubAgent: SubAgent | null;
+  /** 全局 sources（从整个对话的所有 toolCalls 中提取） */
+  allSources?: Source[];
+}
+
+/**
+ * 从工具调用结果中提取 Sources（真实 URL）
+ * 这样可以避免 LLM 幻觉出错误的 URL
+ */
+function extractSourcesFromToolCalls(toolCalls: ToolCall[]): Source[] {
+  const sources: Source[] = [];
+  let index = 1;
+
+  for (const toolCall of toolCalls) {
+    // 只处理 confluence_get_page 的结果
+    if (toolCall.name !== "confluence_get_page" || !toolCall.result) {
+      continue;
+    }
+
+    try {
+      const result = JSON.parse(toolCall.result);
+      const metadata = result?.metadata;
+
+      if (metadata?.url && metadata?.title) {
+        sources.push({
+          index: index++,
+          title: metadata.title,
+          url: metadata.url,
+        });
+      }
+    } catch {
+      // 解析失败，跳过
+    }
+  }
+
+  return sources;
+}
+
+/**
+ * 判断是否是最终报告（应该显示参考来源列表）
+ * 标准：内容超过 500 字符 且 包含至少 3 个引文标记
+ */
+function isFinalReport(content: string): boolean {
+  if (!content || content.length < 500) {
+    return false;
+  }
+  // 统计引文标记数量
+  const citationMatches = content.match(/\[\d+\]/g);
+  return citationMatches !== null && citationMatches.length >= 3;
 }
 
 export const ChatMessage = React.memo<ChatMessageProps>(
-  ({ message, toolCalls, showAvatar, onSelectSubAgent, selectedSubAgent }) => {
+  ({ message, toolCalls, showAvatar, onSelectSubAgent, selectedSubAgent, allSources }) => {
     const isUser = message.type === "human";
     const messageContent = extractStringFromMessageContent(message);
     const hasContent = messageContent && messageContent.trim() !== "";
     const hasToolCalls = toolCalls.length > 0;
+
+    // 判断是否是最终报告
+    const isFinalReportMessage = useMemo(
+      () => isFinalReport(messageContent || ""),
+      [messageContent],
+    );
+
+    // 从工具调用中提取当前消息的 sources
+    // 对于最终报告，优先使用全局 allSources（包含整个对话的所有来源）
+    const sources = useMemo(() => {
+      if (isFinalReportMessage && allSources && allSources.length > 0) {
+        return allSources;
+      }
+      return extractSourcesFromToolCalls(toolCalls);
+    }, [toolCalls, allSources, isFinalReportMessage]);
+
+    // 只在最终报告显示参考来源列表
+    const showSourcesList = isFinalReportMessage;
+
     const subAgents = useMemo(() => {
       return toolCalls
         .filter((toolCall: ToolCall) => {
@@ -84,7 +151,11 @@ export const ChatMessage = React.memo<ChatMessageProps>(
               {isUser ? (
                 <p className={styles.text}>{messageContent}</p>
               ) : (
-                <MarkdownContent content={messageContent} />
+                <MarkdownContent
+                  content={messageContent}
+                  sources={sources}
+                  showSourcesList={showSourcesList}
+                />
               )}
             </div>
           )}
