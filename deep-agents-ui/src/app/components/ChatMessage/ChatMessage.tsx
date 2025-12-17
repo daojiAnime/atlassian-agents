@@ -6,7 +6,6 @@ import { SubAgentIndicator } from "../SubAgentIndicator/SubAgentIndicator";
 import { ToolCallBox } from "../ToolCallBox/ToolCallBox";
 import { MarkdownContent } from "../MarkdownContent/MarkdownContent";
 import type { SubAgent, ToolCall, Source } from "../../types/types";
-import { extractSourcesFromToolCalls } from "../../utils/sourceExtractor";
 import styles from "./ChatMessage.module.scss";
 import { Message } from "@langchain/langgraph-sdk";
 import { extractStringFromMessageContent } from "../../utils/utils";
@@ -21,20 +20,50 @@ interface ChatMessageProps {
   allSources?: Source[];
 }
 
-/** 最终报告判定阈值 */
-const FINAL_REPORT_MIN_LENGTH = 500;
-const FINAL_REPORT_MIN_CITATIONS = 3;
+/**
+ * 从工具调用结果中提取 Sources（真实 URL）
+ * 这样可以避免 LLM 幻觉出错误的 URL
+ */
+function extractSourcesFromToolCalls(toolCalls: ToolCall[]): Source[] {
+  const sources: Source[] = [];
+  let index = 1;
+
+  for (const toolCall of toolCalls) {
+    // 只处理 confluence_get_page 的结果
+    if (toolCall.name !== "confluence_get_page" || !toolCall.result) {
+      continue;
+    }
+
+    try {
+      const result = JSON.parse(toolCall.result);
+      const metadata = result?.metadata;
+
+      if (metadata?.url && metadata?.title) {
+        sources.push({
+          index: index++,
+          title: metadata.title,
+          url: metadata.url,
+        });
+      }
+    } catch {
+      // 解析失败，跳过
+    }
+  }
+
+  return sources;
+}
 
 /**
  * 判断是否是最终报告（应该显示参考来源列表）
- * 标准：内容超过阈值字符 且 包含至少阈值个引文标记
+ * 标准：内容超过 500 字符 且 包含至少 3 个引文标记
  */
 function isFinalReport(content: string): boolean {
-  if (!content || content.length < FINAL_REPORT_MIN_LENGTH) {
+  if (!content || content.length < 500) {
     return false;
   }
+  // 统计引文标记数量
   const citationMatches = content.match(/\[\d+\]/g);
-  return citationMatches !== null && citationMatches.length >= FINAL_REPORT_MIN_CITATIONS;
+  return citationMatches !== null && citationMatches.length >= 3;
 }
 
 export const ChatMessage = React.memo<ChatMessageProps>(
