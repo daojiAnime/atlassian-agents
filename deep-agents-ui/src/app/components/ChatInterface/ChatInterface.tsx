@@ -10,10 +10,11 @@ import React, {
 } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Bot, LoaderCircle, SquarePen, History, X } from "lucide-react";
+import { Send, Bot, LoaderCircle, SquarePen, History } from "lucide-react";
 import { ChatMessage } from "../ChatMessage/ChatMessage";
 import { ThreadHistorySidebar } from "../ThreadHistorySidebar/ThreadHistorySidebar";
-import type { SubAgent, TodoItem, ToolCall, Source } from "../../types/types";
+import type { SubAgent, TodoItem, ToolCall } from "../../types/types";
+import { extractSourcesFromToolCalls } from "../../utils/sourceExtractor";
 import { useChat } from "../../hooks/useChat";
 import styles from "./ChatInterface.module.scss";
 import { Message } from "@langchain/langgraph-sdk";
@@ -183,34 +184,8 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(
 
     // 从所有消息的 toolCalls 中提取 sources（用于最终报告）
     const allSources = useMemo(() => {
-      const sources: Source[] = [];
-      let index = 1;
-
-      for (const data of processedMessages) {
-        for (const toolCall of data.toolCalls) {
-          if (toolCall.name !== "confluence_get_page" || !toolCall.result) {
-            continue;
-          }
-          try {
-            const result = JSON.parse(toolCall.result);
-            const metadata = result?.metadata;
-            if (metadata?.url && metadata?.title) {
-              // 避免重复
-              if (!sources.find((s) => s.url === metadata.url)) {
-                sources.push({
-                  index: index++,
-                  title: metadata.title,
-                  url: metadata.url,
-                });
-              }
-            }
-          } catch {
-            // 解析失败，跳过
-          }
-        }
-      }
-
-      return sources;
+      const allToolCalls = processedMessages.flatMap((data) => data.toolCalls);
+      return extractSourcesFromToolCalls(allToolCalls);
     }, [processedMessages]);
 
     return (

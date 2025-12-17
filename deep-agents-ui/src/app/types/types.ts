@@ -42,4 +42,6 @@ export interface Source {
   index: number;
   title: string;
   url: string;
+  /** 来源类型：page(页面) 或 attachment(附件) */
+  type?: "page" | "attachment";
 }

@@ -110,6 +110,43 @@ function processCitations(content: string, sources: Source[]): string {
 }
 
 /**
+ * 从内容中提取被实际引用的编号
+ * 匹配 [1], [2], [1][2] 等格式
+ */
+function extractCitedIndices(content: string): Set<number> {
+  const citedIndices = new Set<number>();
+  // 匹配 [数字] 但排除 Markdown 链接格式
+  const citationRegex = /\[(\d+)\](?!\(|[^\]]*\]\()/g;
+  let match;
+  while ((match = citationRegex.exec(content)) !== null) {
+    citedIndices.add(parseInt(match[1], 10));
+  }
+  return citedIndices;
+}
+
+/**
+ * 过滤并重新编号来源列表，只保留被引用的来源
+ */
+function filterAndRenumberSources(
+  sources: Source[],
+  citedIndices: Set<number>
+): { filteredSources: Source[]; indexMap: Map<number, number> } {
+  // 过滤出被引用的来源
+  const citedSources = sources.filter((s) => citedIndices.has(s.index));
+
+  // 按原始 index 排序
+  citedSources.sort((a, b) => a.index - b.index);
+
+  // 创建新旧编号映射（保持原始编号，不重新编号）
+  const indexMap = new Map<number, number>();
+  citedSources.forEach((s) => {
+    indexMap.set(s.index, s.index);
+  });
+
+  return { filteredSources: citedSources, indexMap };
+}
+
+/**
  * 生成参考来源列表的 Markdown
  */
 function generateSourcesList(sources: Source[]): string {
@@ -153,7 +190,7 @@ export const MarkdownContent = React.memo<MarkdownContentProps>(
     // 预处理内容：
     // 1. 移除 LLM 生成的参考来源（可能有错误 URL）
     // 2. 转换引文为可点击链接
-    // 3. 只在 showSourcesList=true 时添加参考来源列表
+    // 3. 只在 showSourcesList=true 时添加参考来源列表（仅显示被引用的来源）
     const processedContent = useMemo(() => {
       if (sources.length === 0) {
         return content;
@@ -162,12 +199,18 @@ export const MarkdownContent = React.memo<MarkdownContentProps>(
       // 移除 LLM 生成的参考来源部分
       let result = removeLLMGeneratedSources(content);
 
-      // 转换引文标记为链接
+      // 提取文中实际引用的编号
+      const citedIndices = extractCitedIndices(result);
+
+      // 过滤出被引用的来源
+      const { filteredSources } = filterAndRenumberSources(sources, citedIndices);
+
+      // 转换引文标记为链接（使用完整的 sources 以支持所有引用）
       result = processCitations(result, sources);
 
-      // 只在最终报告时添加参考来源列表
-      if (showSourcesList) {
-        result += generateSourcesList(sources);
+      // 只在最终报告时添加参考来源列表（仅显示被引用的来源）
+      if (showSourcesList && filteredSources.length > 0) {
+        result += generateSourcesList(filteredSources);
       }
 
       return result;
